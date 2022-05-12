@@ -10,6 +10,7 @@ from swarm.AlgorithmVariant import AlgorithmVariant
 
 random = default_rng()
 
+
 class Firework:
     def __init__(
         self,
@@ -21,7 +22,7 @@ class Firework:
         adaptation_function: Callable[[list[float]], float],
         bounds: tuple,
         dimensions: int,
-        algorithm_variant: AlgorithmVariant
+        algorithm_variant: AlgorithmVariant,
     ):
         self.dimensions = dimensions
         self.maximum_amplitude = maximum_amplitude
@@ -69,16 +70,21 @@ class Firework:
             / sum
         )
 
-    def create_spark(self, gaussian: bool, best_position=None) -> None:
+    def create_spark(self, gaussian: bool, best_positions=None) -> 'Firework':
         spark = deepcopy(self)
         number_of_displacements = round(self.dimensions * random.random())
         selected_dimensions = random.choice(
-            range(self.dimensions), number_of_displacements, replace=False)
+            range(self.dimensions), number_of_displacements, replace=False
+        )
         if gaussian:
-            if self.algorithm_variant == AlgorithmVariant.NEW_GAUSSIAN:
+            # If best_positions is provided, we perform the 'New Gaussian' variant
+            if best_positions is not None:
                 coeffecient = random.normal(0, 1)
                 for i in selected_dimensions:
-                    spark.positions[i] += (best_position[i] - spark.positions[i]) * coeffecient
+                    spark.positions[i] += (
+                        best_positions[i] - spark.positions[i]
+                    ) * coeffecient
+            # Else normal gaussian (Algorithm 2 from the paper)
             else:
                 coeffecient = random.normal(1, 1)
                 for i in selected_dimensions:
@@ -87,7 +93,9 @@ class Firework:
             displacement = self.maximum_amplitude * random.uniform(-1, 1)
             for i in selected_dimensions:
                 spark.positions[i] += displacement
+        # Clipping positions to function bounds
         spark.positions = clip(spark.positions, self.bounds[0], self.bounds[1])
+        # Updating spark's adaptation because positions have changed
         spark.update_adaptation()
         return spark
 

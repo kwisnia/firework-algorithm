@@ -28,6 +28,7 @@ class Battery:
         algorithm_variant: AlgorithmVariant,
         starting_vectors: list[list[float]] = None,
     ) -> None:
+        # Initializing the fireworks (n random locations)
         if starting_vectors is not None:
             self.fireworks = [
                 Firework(
@@ -41,7 +42,7 @@ class Battery:
                     dim,
                     algorithm_variant,
                 )
-                for _, starting_vector in zip(range(population_size), starting_vectors)
+                for starting_vector in starting_vectors
             ]
         else:
             self.fireworks = [
@@ -63,67 +64,72 @@ class Battery:
         self.iterations = iterations
         self.gaussian_fireworks = gaussian_fireworks
         self.population_size = population_size
+        self.algorithm_variant = algorithm_variant
 
     def find_minimum(self):
         best_adaptations = []
-        best_actual_adaptation = np.inf
-        best_positions = self.fireworks[0].positions
-        sparks = []
-        for i in range(self.iterations):
-            print(i)
-            best_firework_adaptation = self.fireworks[0].actual_adaptation
+        for _ in range(self.iterations):
             worst_firework_adaptation = self.fireworks[0].actual_adaptation
+            best_firework_adaptation = self.fireworks[0].actual_adaptation
+            best_positions = self.fireworks[0].positions
             for firework in self.fireworks:
-                # Checking if global best changes
-                if firework.actual_adaptation < best_actual_adaptation:
-                    best_actual_adaptation = firework.actual_adaptation
-                    best_positions = firework.positions
                 # Checking for worst and best in current population to use in amplitude and number of sparks calculation
-                if firework.actual_adaptation > worst_firework_adaptation:
-                    worst_firework_adaptation = firework.actual_adaptation
-                elif firework.actual_adaptation < best_firework_adaptation:
+                if firework.actual_adaptation < best_firework_adaptation:
                     best_firework_adaptation = firework.actual_adaptation
-
-            best_adaptations.append(best_actual_adaptation)
-            # Used in equation 2 - number of sparks
-            distance_from_worst_sum = (
-                np.sum(
-                    [
-                        worst_firework_adaptation - f.actual_adaptation
-                        for f in self.fireworks
-                    ]
-                )
-                + sys.float_info.epsilon
+                    best_positions = firework.positions
+                elif firework.actual_adaptation > worst_firework_adaptation:
+                    worst_firework_adaptation = firework.actual_adaptation
+            best_adaptations.append(best_firework_adaptation)
+            # Generating new sparks
+            sparks = self.create_sparks(
+                best_firework_adaptation, worst_firework_adaptation, best_positions
             )
-            # Used in equation 4 - amplitude of explosion
-            distance_to_best_sum = (
-                np.sum(
-                    [
-                        f.actual_adaptation - best_firework_adaptation
-                        for f in self.fireworks
-                    ]
-                )
-                + sys.float_info.epsilon
-            )
-
-            for firework in self.fireworks:
-                firework.calculate_number_of_sparks(
-                    worst_firework_adaptation, distance_from_worst_sum
-                )
-                firework.calculate_amplitude(
-                    best_firework_adaptation, distance_to_best_sum
-                )
-                # Creating normal sparks for each firework (Algorithm 1 in the paper)
-                sparks.append(firework.create_spark(False))
-            # Creating gaussian fireworks (Algorithm 2 in the paper)
-            for _ in range(self.gaussian_fireworks):
-                random_firework = random.choice(self.fireworks)
-                sparks.append(random_firework.create_spark(True))
             # Merging sparks with current fireworks to create new explosions generation
             sparks.extend(self.fireworks)
             self.create_next_generation(sparks)
 
-        return best_positions, best_adaptations
+        return best_adaptations
+
+    def create_sparks(
+        self,
+        best_firework_adaptation: float,
+        worst_firework_adaptation: float,
+        best_positions: list[float] = None,
+    ) -> list[Firework]:
+        sparks = []
+        # Used in equation 2 - number of sparks
+        distance_from_worst_sum = (
+            np.sum(
+                [
+                    worst_firework_adaptation - f.actual_adaptation
+                    for f in self.fireworks
+                ]
+            )
+            + sys.float_info.epsilon
+        )
+        # Used in equation 4 - amplitude of explosion
+        distance_to_best_sum = (
+            np.sum(
+                [f.actual_adaptation - best_firework_adaptation for f in self.fireworks]
+            )
+            + sys.float_info.epsilon
+        )
+
+        for firework in self.fireworks:
+            firework.calculate_number_of_sparks(
+                worst_firework_adaptation, distance_from_worst_sum
+            )
+            firework.calculate_amplitude(best_firework_adaptation, distance_to_best_sum)
+            # Creating normal sparks for each firework (Algorithm 1 in the paper)
+            sparks.append(firework.create_spark(False))
+        # Creating gaussian fireworks (Algorithm 2 in the paper)
+        for _ in range(self.gaussian_fireworks):
+            random_firework = random.choice(self.fireworks)
+            if self.algorithm_variant == AlgorithmVariant.NEW_GAUSSIAN:
+                sparks.append(random_firework.create_spark(True, best_positions))
+            else:
+                sparks.append(random_firework.create_spark(True))
+        return sparks
 
     def create_next_generation(self, sparks: list[Firework]) -> None:
         next_generation = []

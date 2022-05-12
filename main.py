@@ -1,3 +1,4 @@
+from numpy import mean
 from swarm.AlgorithmVariant import AlgorithmVariant
 from swarm.Battery import Battery
 from utils import *
@@ -8,11 +9,11 @@ DIMENSIONS = 30
 MAX_SPARKS = 50
 A = 0.04
 B = 0.8
-MAX_AMPLITUDE = 40
+MAX_AMPLITUDE = 40.0
 GAUSSIAN_SPARKS = 5
-ITERATIONS = 50
-CHOSEN_FUNCTION = sphere_function
-CHOSEN_BOUNDS = sphere_bounds
+ITERATIONS = 100
+CHOSEN_FUNCTION = ackley_function
+CHOSEN_BOUNDS = ackley_bounds
 
 
 def plot(
@@ -34,7 +35,8 @@ def plot(
 if __name__ == "__main__":
     results_1 = []
     results_2 = []
-    swarm = Battery(
+    for _ in range(20):
+        swarm = Battery(
             MAX_AMPLITUDE,
             DIMENSIONS,
             ITERATIONS,
@@ -48,9 +50,9 @@ if __name__ == "__main__":
             AlgorithmVariant.VANILLA,
         )
 
-    best_pos, best_min = swarm.find_minimum()
-    results_1.append(best_min[-1])
-    print(f"Minimum FWA {best_min[-1]}")
+        best_min = swarm.find_minimum()
+        results_1.append(best_min[-1])
+    print(f"Minimum FWA {mean(results_1)}")
     plot(
         [best_min],
         "Numer iteracji",
